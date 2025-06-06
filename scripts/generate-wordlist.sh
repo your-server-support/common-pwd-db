@@ -1,5 +1,5 @@
 #!/bin/bash
-
+BASE_DIR=$(pwd)
 # Create temporary directory
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
@@ -16,14 +16,17 @@ echo "Combining and sorting wordlists..."
 cat /tmp/wordlist1.txt /tmp/wordlist2.txt /tmp/wordlist3.txt /tmp/wordlist4.txt | sort -u > /tmp/combined-wordlist.txt
 
 # Create roles/password_policy/files directory if it doesn't exist
-mkdir -p ../db
+mkdir -p $BASE_DIR/db
 
 # Move the combined wordlist to the role's files directory
 echo "Moving combined wordlist to role's files directory..."
-mv /tmp/combined-wordlist.txt ../db/
+
+mv /tmp/combined-wordlist.txt $BASE_DIR/db/
+cp $BASE_DIR/db/combined-wordlist.txt $BASE_DIR/ansible-roles/password-policy/files/
+
 
 # Cleanup
 cd - > /dev/null
 rm -rf "$TEMP_DIR"
 
-echo "Wordlist generation complete. The combined wordlist is now in ../db/combined-wordlist.txt" 
+echo "Wordlist generation complete. The combined wordlist is now in $BASE_DIR/db/combined-wordlist.txt" 
