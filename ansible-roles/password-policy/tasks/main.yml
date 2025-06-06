@@ -1,0 +1,195 @@
+---
+# Install required packages
+- name: Install required packages
+  apt:
+    name:
+      - libpam-pwquality
+      - libpam-modules
+      - cracklib-runtime
+    state: present
+    update_cache: yes
+
+# Configure PAM password quality
+- name: Configure PAM password quality
+  template:
+    src: pwquality.conf.j2
+    dest: /etc/security/pwquality.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+# Configure PAM password policy
+- name: Configure PAM password policy
+  template:
+    src: common-password.j2
+    dest: /etc/pam.d/common-password
+    owner: root
+    group: root
+    mode: '0644'
+
+# Configure PAM authentication policy
+- name: Configure PAM authentication policy
+  template:
+    src: common-auth.j2
+    dest: /etc/pam.d/common-auth
+    owner: root
+    group: root
+    mode: '0644'
+
+# Configure login.defs
+- name: Configure login.defs
+  template:
+    src: login.defs.j2
+    dest: /etc/login.defs
+    owner: root
+    group: root
+    mode: '0644'
+
+# Apply password policy to existing users
+- name: Apply password policy to existing users
+  shell: chage -M {{ password_policy.max_age }} -m {{ password_policy.min_age }} -W {{ password_policy.warn_age }} {{ item }}
+  with_items: "{{ existing_users }}"
+  when: existing_users is defined
+  ignore_errors: yes
+
+- name: Create password policy documentation
+  copy:
+    content: |
+      # Password Policy Documentation
+
+      ## Password Requirements
+      1. Minimum length: 12 characters
+      2. Must contain at least:
+         - One uppercase letter
+         - One lowercase letter
+         - One number
+         - One special character
+      3. Maximum password age: 90 days
+      4. Minimum password age: 1 day
+      5. Password history: 5 previous passwords
+      6. Password complexity:
+         - No more than 3 consecutive identical characters
+         - No more than 4 characters in sequence
+         - No dictionary words
+         - No user information in password
+      7. Maximum failed attempts: 3
+      8. Password change required on first login
+
+      ## PCI-DSS Compliance
+      This policy complies with PCI-DSS requirements:
+      - Requirement 8.2.3: Password complexity
+      - Requirement 8.2.4: Password history
+      - Requirement 8.2.5: Password expiration
+      - Requirement 8.2.6: Password reuse
+      - Requirement 8.4: Account lockout
+      - Requirement 8.5: Unique user IDs
+      - Requirement 8.6: Password changes
+
+      ## Implementation Details
+      - Using pam_pwquality for password quality checks
+      - Using pam_unix for password history
+      - Using login.defs for password aging
+      - Using PAM for account lockout
+    dest: /etc/security/password-policy.md
+    mode: '0644'
+
+- name: Configure account lockout policy
+  copy:
+    content: |
+      # Account lockout configuration
+      auth    required    pam_tally2.so deny=3 unlock_time=900 onerr=fail
+      account required    pam_tally2.so
+    dest: /etc/pam.d/common-auth
+    mode: '0644'
+
+- name: Create password policy enforcement script
+  copy:
+    content: |
+      #!/bin/bash
+      # Password policy enforcement script
+
+      # Check password age
+      check_password_age() {
+          local user=$1
+          local max_days=90
+          local last_change=$(chage -l "$user" | grep "Last password change" | cut -d: -f2)
+          local days_since_change=$(( ($(date +%s) - $(date -d "$last_change" +%s)) / 86400 ))
+          
+          if [ $days_since_change -gt $max_days ]; then
+              echo "WARNING: Password for $user is older than $max_days days"
+              return 1
+          fi
+          return 0
+      }
+
+      # Check password complexity
+      check_password_complexity() {
+          local user=$1
+          local passwd=$(getent shadow "$user" | cut -d: -f2)
+          
+          if [[ $passwd == *"!"* ]]; then
+              echo "WARNING: Account $user is locked"
+              return 1
+          fi
+          return 0
+      }
+
+      # Main function
+      main() {
+          local users=$(getent passwd | cut -d: -f1)
+          local failed=0
+          
+          for user in $users; do
+              if ! check_password_age "$user"; then
+                  failed=1
+              fi
+              if ! check_password_complexity "$user"; then
+                  failed=1
+              fi
+          done
+          
+          exit $failed
+      }
+
+      main
+    dest: /usr/local/bin/check-password-policy
+    mode: '0755'
+
+- name: Add password policy check to cron
+  copy:
+    content: |
+      # Check password policy compliance daily
+      0 0 * * * root /usr/local/bin/check-password-policy >> /var/log/password-policy.log 2>&1
+    dest: /etc/cron.d/password-policy
+    mode: '0644'
+
+- name: Create cracklib update script
+  copy:
+    content: |
+      #!/bin/bash
+      # Update cracklib dictionary
+      
+      # Update cracklib dictionary from local wordlist
+      create-cracklib-dict /etc/security/wordlists/combined-wordlist.txt > /usr/share/dict/cracklib-small
+      
+      # Log update
+      echo "$(date): Cracklib dictionary updated" >> /var/log/cracklib-update.log
+    dest: /usr/local/bin/update-cracklib
+    mode: '0755'
+
+- name: Create wordlists directory
+  file:
+    path: /etc/security/wordlists
+    state: directory
+    mode: '0755'
+
+- name: Copy combined wordlist
+  copy:
+    src: files/combined-wordlist.txt
+    dest: /etc/security/wordlists/combined-wordlist.txt
+    mode: '0644'
+
+- name: Run initial cracklib update
+  shell: /usr/local/bin/update-cracklib
+  args:
+    creates: /var/log/cracklib-update.log 

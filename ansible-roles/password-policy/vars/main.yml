@@ -1,0 +1,20 @@
+---
+# Password policy variables
+password_policy:
+  min_length: 12
+  max_age: 90
+  min_age: 1
+  warn_age: 7
+  history: 5
+  max_retries: 3
+  lockout_time: 900  # 15 minutes in seconds
+  complexity:
+    min_classes: 3
+    max_repeat: 3
+    max_class_repeat: 3
+    min_digits: 1
+    min_uppercase: 1
+    min_lowercase: 1
+    min_special: 1
+    max_sequence: 4
+    difok: 8  # Minimum number of characters that must be different from old password 

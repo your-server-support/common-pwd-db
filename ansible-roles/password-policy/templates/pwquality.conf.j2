@@ -1,0 +1,17 @@
+# Password quality requirements
+minlen = {{ password_policy.min_length }}
+dcredit = -{{ password_policy.complexity.min_digits }}
+ucredit = -{{ password_policy.complexity.min_uppercase }}
+ocredit = -{{ password_policy.complexity.min_special }}
+lcredit = -{{ password_policy.complexity.min_lowercase }}
+minclass = {{ password_policy.complexity.min_classes }}
+maxrepeat = {{ password_policy.complexity.max_repeat }}
+maxclassrepeat = {{ password_policy.complexity.max_class_repeat }}
+gecoscheck = 1
+dictcheck = 1
+usercheck = 1
+enforcing = 1
+retry = {{ password_policy.max_retries }}
+difok = {{ password_policy.complexity.difok }}
+maxsequence = {{ password_policy.complexity.max_sequence }}
+dictpath = /usr/share/dict/cracklib-small 

@@ -1,0 +1,4 @@
+# Authentication policy configuration
+auth    required    pam_unix.so
+auth    required    pam_tally2.so deny={{ password_policy.max_retries }} unlock_time={{ password_policy.lockout_time }} reset
+auth    required    pam_deny.so 
